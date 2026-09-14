@@ -123,7 +123,7 @@ uv run python -m stardew_agent.test_mcp
 ```
 
 ```json
-{ "character": "CyberJu", "message": "..." }
+{ "character": "Haley", "message": "..." }
 ```
 
 `character` is `CyberJu` (tool-using assistant) or `Haley` (spouse dialogue).
