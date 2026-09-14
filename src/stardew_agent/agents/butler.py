@@ -7,6 +7,10 @@ from typing_extensions import TypedDict
 
 from stardew_agent.model import llm
 from stardew_agent.mcp_client import get_tools
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class ButlerState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
@@ -18,15 +22,9 @@ async def create_butler():
     model = llm.bind_tools(tools=tools)
 
     async def call_model(state: ButlerState):
-        #print("\n======= MESSAGES ========")
-        #for message in state["messages"]:
-        #    print(message)
-        #    print()
         response = await model.ainvoke(state["messages"])
-        #print("MODEL RESPONSE")
-        #print(response)
-        #print("TOOL CALLS:")
-        #print(response.tool_calls)
+    
+        logger.info("LLM response: %r", response.content)
         return {"messages": [response]}
 
     def should_continue(state: ButlerState) -> Literal["tools", END]:
@@ -45,3 +43,4 @@ async def create_butler():
     graph.add_edge("tools", "agent")
 
     return graph.compile()
+
