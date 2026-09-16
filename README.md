@@ -24,8 +24,8 @@ grounded in what is actually happening on the farm.
 - In game: type `cj <message>` in the chat box to talk to it
 - Style: concise, calm, slightly formal; 1–3 short points
 
-<!-- TODO: insert your screenshot below -->
-![CyberJu in game](docs/screenshots/cyberju.png)
+<img width="1512" height="982" alt="Screenshot 2026-09-12 at 5 16 55 PM" src="https://github.com/user-attachments/assets/faab78a1-07a7-4616-9588-1b2b0d851a11" />
+
 
 ### Spouse — living dialogue
 
@@ -40,8 +40,8 @@ no longer limited to the lines written for her.
   answers with a few replies you can pick from
 - Style: one or two natural sentences, no Markdown
 
-<!-- TODO: insert your screenshot below -->
-![Spouse dialogue](docs/screenshots/spouse.png)
+<img width="3024" height="1964" alt="image" src="https://github.com/user-attachments/assets/21f76ce8-45a5-457c-b8f6-31d2affad136" />
+
 
 ## Personas
 
@@ -171,7 +171,7 @@ uv run python -m stardew_agent.test_mcp
 ```
 
 ```json
-{ "character": "CyberJu", "message": "..." }
+{ "character": "Haley", "message": "..." }
 ```
 
 `character` is either `CyberJu` (the tool-using assistant) or the name of an
