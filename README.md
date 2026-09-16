@@ -34,12 +34,60 @@ generated on the spot. It keeps the character's personality and memories, but is
 no longer limited to the lines written for her.
 
 - Graph: `src/stardew_agent/agents/spouse.py`
-- Prompt: `HALEY_PROMPT` in `src/stardew_agent/prompts.py`
-- In game: walk up to your spouse and talk to her — the dialogue is generated live
+- Prompt: assembled by `src/stardew_agent/persona.py` from a character document
+  and a skill document
+- In game: hold `Alt` and click your spouse, type what you want to say, and she
+  answers with a few replies you can pick from
 - Style: one or two natural sentences, no Markdown
 
 <!-- TODO: insert your screenshot below -->
 ![Spouse dialogue](docs/screenshots/spouse.png)
+
+## Personas
+
+A prompt is assembled from three separate things. Keeping them apart is what
+lets a skill apply to a different character later, and a character appear in
+more than one mode.
+
+| Layer | Lives in | Answers |
+| --- | --- | --- |
+| Character | `src/stardew_agent/assets/character/<name>.md` | who someone is — identity, interests, relationships |
+| Skill | `src/stardew_agent/assets/skills/<skill>/SKILL.md` | how to behave in a mode, whoever you are |
+| Format contract | `DIALOGUE_FORMAT_CONTRACT` in `prompts.py` | how to emit the reply the mod parses |
+
+They are joined character → skill → contract, so the output contract sits
+closest to where generation starts.
+
+Today the only pairing is Haley (`character/haley.md`) in the spouse mode
+(`skills/spouse/SKILL.md`).
+
+These were seeded from the
+[stardew-skills](https://github.com/HeptaneL/stardew-skills) repo, which is a
+separate experimental space. The copies here are what actually runs, and they
+are **not** kept in sync with it — edit them here.
+
+### Not wired up yet
+
+The spouse skill used to describe looking things up through memory and game
+tools. Neither exists on this path yet: `agents/spouse.py` binds no tools, and
+there is no memory store. Rather than asking for capabilities that are not
+there, the skill now states plainly that the character does not remember earlier
+conversations and does not know what the player has been doing today.
+
+When tools or memory do land, these are the sections to revisit:
+`## Use of Context` and `## Relationship Continuity` in
+`assets/skills/spouse/SKILL.md`.
+
+### Adding a character
+
+1. Add `src/stardew_agent/assets/character/<name>.md`, named after the NPC's
+   internal name (lowercase). `Haley` is looked up as `haley.md`.
+2. Talk to them in game as the player's spouse.
+
+No code change is needed — `POST /chat` resolves any name that has a document
+and returns `404` for any that does not.
+
+The markdown is read on every request, so edits take effect without a restart.
 
 ## Architecture
 
@@ -106,7 +154,7 @@ uv run uvicorn stardew_agent.api:app --host 127.0.0.1 --port 8000
 Then launch the game with the mod enabled:
 
 - **CyberJu:** open the chat box and type `cj what should I do today?`
-- **Spouse:** talk to your spouse and read the generated dialogue.
+- **Spouse:** hold `Alt` and click your spouse, then type your message.
 
 To check that the MCP server and mod connection work, run:
 
@@ -126,8 +174,10 @@ uv run python -m stardew_agent.test_mcp
 { "character": "CyberJu", "message": "..." }
 ```
 
-`character` is `CyberJu` (tool-using assistant) or `Haley` (spouse dialogue).
-Any other value is rejected.
+`character` is either `CyberJu` (the tool-using assistant) or the name of an
+NPC with a character document, which is answered as the player's spouse.
+The name is matched case-insensitively against
+`src/stardew_agent/assets/character/`, and an unknown name returns `404`.
 
 ## Project layout
 
@@ -137,7 +187,11 @@ src/stardew_agent/
 ├── agents/
 │   ├── butler.py     # CyberJu — ReAct loop with MCP tools
 │   └── spouse.py     # Spouse — single-node dialogue graph
-├── prompts.py        # CYBERJU_PROMPT, HALEY_PROMPT
+├── assets/
+│   ├── character/    # who someone is, one file per NPC
+│   └── skills/       # how to behave in a mode, one dir per mode
+├── persona.py        # loads character + skill, assembles the prompt
+├── prompts.py        # CYBERJU_PROMPT, DIALOGUE_FORMAT_CONTRACT
 ├── mcp_client.py     # MCP stdio client -> stardew-mcp-server
 ├── model.py          # LLM client
 └── config.py         # .env settings
