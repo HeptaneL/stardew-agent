@@ -4,7 +4,12 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from stardew_agent.agents.butler import create_butler
 from stardew_agent.agents.spouse import create_spouse
-from stardew_agent.persona import PersonaNotFound, spouse_prompt
+from stardew_agent.agents.villager import create_villager
+from stardew_agent.persona import (
+    PersonaNotFound,
+    spouse_prompt,
+    villager_prompt,
+)
 from stardew_agent.prompts import CYBERJU_PROMPTS, resolve_language
 import logging
 
@@ -16,23 +21,41 @@ logging.basicConfig(
 
 app = FastAPI()
 
-spouse_agents = {}
+# The two ways a named character can be met. Which one applies is the mod's call,
+# not ours: it is the side that can see whether the farmer married this person,
+# and the name alone cannot say.
+SPOUSE = "spouse"
+VILLAGER = "villager"
+
+_PROMPTS = {SPOUSE: spouse_prompt, VILLAGER: villager_prompt}
+_AGENT_FACTORIES = {SPOUSE: create_spouse, VILLAGER: create_villager}
+
+# One graph per (mode, character), so the same villager talked to as a spouse in
+# one save and as a neighbour in another keeps two separate histories. Each graph
+# carries its own checkpointer, which is what makes that separation hold.
+character_agents = {}
 
 class ChatRequest(BaseModel):
     character: str
     message: str
     thread_id: str
     language: str = "en"
+    # Not defaulted: a request that does not say which mode it wants would be
+    # answered as a villager, and the farmer's own spouse would slide into the
+    # wrong persona without anything looking wrong. Better a 422.
+    is_spouse: bool
 
 class ChatResponse(BaseModel):
     character: str
     message: str
 
-async def get_spouse_agent(character: str):
-    if character not in spouse_agents:
-        spouse_agents[character] = await create_spouse()
+async def get_character_agent(kind: str, character: str):
+    key = (kind, character)
 
-    return spouse_agents[character]
+    if key not in character_agents:
+        character_agents[key] = await _AGENT_FACTORIES[kind]()
+
+    return character_agents[key]
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
@@ -60,14 +83,19 @@ async def chat(request: ChatRequest):
             character=request.character,
             message=content,
         )
-    # Not CyberJu, so treat the name as a character sheet and talk to them as
-    # the player's spouse. Adding a character means adding one markdown file.
+    # Not CyberJu, so treat the name as a character sheet. Which skill is added
+    # to that sheet is the one thing the two modes disagree on: the same person
+    # is spoken to as the player's spouse or as an ordinary villager, and the
+    # rest of the turn — agent, memory, reply format — is identical either way.
+    # Adding a character means adding one markdown file.
+    kind = SPOUSE if request.is_spouse else VILLAGER
+
     try:
-        system_prompt = spouse_prompt(request.character, language)
+        system_prompt = _PROMPTS[kind](request.character, language)
     except PersonaNotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-    agent = await get_spouse_agent(request.character)
+    agent = await get_character_agent(kind, request.character)
 
     config = {
         "configurable": {
@@ -92,7 +120,7 @@ async def chat(request: ChatRequest):
         config = config,
     )
     response = result["messages"][-1]
-    content = format_spouse_reply(response.content)
+    content = format_dialogue_reply(response.content)
 
     return ChatResponse(
         character=request.character,
@@ -116,10 +144,12 @@ def _strip_wrapping_quotes(text: str) -> str:
     return stripped
 
 
-def format_spouse_reply(text: str) -> str:
+def format_dialogue_reply(text: str) -> str:
     """
     Reduce the model's reply to the shape the mod parses: one "- " line for
-    what the spouse says, followed by "% " lines for the farmer's options.
+    what the character says, followed by "% " lines for the farmer's options.
+
+    Shared by both modes: the wire format is the mod's, not the persona's.
 
     Models routinely add a preamble, a code fence, bold markers, or quotes, so
     rather than trusting the output, rebuild it from the lines that actually

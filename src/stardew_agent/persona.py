@@ -42,6 +42,10 @@ SKILL_DIR = ASSETS_ROOT / "skills"
 
 SPOUSE_SKILL = "spouse"
 
+# The directory is plural (assets/skills/villagers) because the document covers
+# talking to any villager rather than to one character.
+VILLAGER_SKILL = "villagers"
+
 
 class PersonaNotFound(LookupError):
     """Raised when a character or skill document is missing."""
@@ -61,18 +65,28 @@ def _read_localized(path: Path, language: str) -> str:
     Only a missing *translation* is tolerated. If the English original is
     missing too, the character has no document at all and the caller should say
     so rather than answer as a character that was never written.
+
+    A translation that exists but is blank counts as missing. An empty file left
+    behind as a placeholder would otherwise reach the prompt as nothing at all —
+    ``build_system_prompt`` drops blank parts — so the mode's whole skill would
+    vanish without a word. Falling back to the original is the lesser surprise.
     """
     if language != DEFAULT_LANGUAGE:
         translated = path.parent / language / path.name
         try:
-            return translated.read_text(encoding="utf-8")
+            text = translated.read_text(encoding="utf-8")
         except FileNotFoundError:
-            logger.warning(
-                "No %s document at %s, falling back to %s",
-                language,
-                translated,
-                path,
-            )
+            text = ""
+
+        if text.strip():
+            return text
+
+        logger.warning(
+            "No usable %s document at %s, falling back to %s",
+            language,
+            translated,
+            path,
+        )
 
     return _read(path)
 
@@ -119,15 +133,35 @@ def build_system_prompt(*, character: str, skill: str, contract: str) -> str:
     return "\n\n".join(part.strip() for part in parts if part.strip())
 
 
-def spouse_prompt(character_name: str, language: str = DEFAULT_LANGUAGE) -> str:
+def character_prompt(
+    character_name: str,
+    skill: str,
+    language: str = DEFAULT_LANGUAGE,
+) -> str:
     """
-    System prompt for talking to ``character_name`` as the player's spouse.
+    System prompt for talking to ``character_name`` in the mode ``skill`` names.
 
     The three parts are resolved separately, so a character translated ahead of
     the skill — or the other way round — still produces a coherent prompt.
     """
     return build_system_prompt(
         character=load_character(character_name, language),
-        skill=load_skill(SPOUSE_SKILL, language),
+        skill=load_skill(skill, language),
         contract=DIALOGUE_FORMAT_CONTRACTS[language],
     )
+
+
+def spouse_prompt(character_name: str, language: str = DEFAULT_LANGUAGE) -> str:
+    """System prompt for talking to ``character_name`` as the player's spouse."""
+    return character_prompt(character_name, SPOUSE_SKILL, language)
+
+
+def villager_prompt(character_name: str, language: str = DEFAULT_LANGUAGE) -> str:
+    """
+    System prompt for talking to ``character_name`` as an ordinary villager.
+
+    Same character sheet as :func:`spouse_prompt`; only the skill differs. Who
+    someone is stays in one file, whether they act married or not stays in
+    another, and the same person can be met either way.
+    """
+    return character_prompt(character_name, VILLAGER_SKILL, language)

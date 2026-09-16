@@ -6,7 +6,7 @@ An experimental Agent runtime that connects AI Agents with
 The goal is to explore how an Agent can perceive and reason about
 a persistent game environment, rather than simply act as a chatbot.
 
-It currently ships two agents and works together with the
+It currently ships three agents and works together with the
 [HelloStardew](https://github.com/HeptaneL/HelloStardew) SMAPI mod on the Steam
 version of the game. Game state flows *into* the agent through MCP, and the
 agent's replies flow back *into* the game.
@@ -38,7 +38,8 @@ the lookups a person living in the valley would plausibly make — the date and
 today's events, her household, how everyone stands with the farmer, where the
 farmer is, and what the farmer has recently been doing. The calendar and
 birthday tools stay with CyberJu, whose job is planning the day rather than
-living it. The allowlist is `SPOUSE_TOOLS` in `src/stardew_agent/mcp_client.py`.
+living it. The allowlist is `CHARACTER_TOOLS` in `src/stardew_agent/mcp_client.py`,
+shared with the Villager agent below.
 
 - Graph: `src/stardew_agent/agents/spouse.py`
 - Prompt: assembled by `src/stardew_agent/persona.py` from a character document
@@ -48,6 +49,28 @@ living it. The allowlist is `SPOUSE_TOOLS` in `src/stardew_agent/mcp_client.py`.
 - Style: one or two natural sentences, no Markdown
 
 <img width="3024" height="1964" alt="image" src="https://github.com/user-attachments/assets/21f76ce8-45a5-457c-b8f6-31d2affad136" />
+
+
+### Villager — the same, for everyone else
+
+The Villager agent does for every other villager what the Spouse agent does for
+the farmer's spouse: replaces the scripted dialogue with something generated on
+the spot, while keeping the character's personality and their actual standing
+with the farmer.
+
+It shares the Spouse agent's tool allowlist and its reply format. The only
+difference between the two is the skill document in the system prompt, so a
+character is written once and can be met either way.
+
+Which of the two applies is the mod's decision, not the agent's: it sends
+`is_spouse` on every request, because it is the side that can see whether the
+farmer married this person, and the name alone cannot say.
+
+- Graph: `src/stardew_agent/agents/villager.py`
+- Prompt: `villager_prompt` in `src/stardew_agent/persona.py`, from a character
+  document and `skills/villagers/SKILL.md`
+- In game: hold `Alt` and click any villager
+- Style: one or two natural sentences, no Markdown
 
 
 ## Personas
@@ -65,8 +88,10 @@ more than one mode.
 They are joined character → skill → contract, so the output contract sits
 closest to where generation starts.
 
-Today the only pairing is Haley (`character/haley.md`) in the spouse mode
-(`skills/spouse/SKILL.md`).
+Today there is one character, Haley (`character/haley.md`), and two skills she
+can be paired with — `skills/spouse/SKILL.md` and `skills/villagers/SKILL.md`.
+The pairing is chosen per request by `is_spouse`; see
+[Villager](#villager--the-same-for-everyone-else).
 
 These were seeded from the
 [stardew-skills](https://github.com/HeptaneL/stardew-skills) repo, which is a
@@ -89,10 +114,14 @@ remember earlier conversations.
 
 1. Add `src/stardew_agent/assets/character/<name>.md`, named after the NPC's
    internal name (lowercase). `Haley` is looked up as `haley.md`.
-2. Talk to them in game as the player's spouse.
+2. Talk to them in game — as the player's spouse, or as any villager.
 
 No code change is needed — `POST /chat` resolves any name that has a document
-and returns `404` for any that does not.
+and returns `404` for any that does not. Both skills already exist, so a new
+character works in both modes as soon as their document does.
+
+The one exception is a name the mod never sends because the NPC cannot be
+talked to, where the request fails before it reaches here.
 
 To add a language, put the translated document in a directory named after it,
 beside the English original (`assets/character/zh/haley.md`). See
@@ -178,10 +207,12 @@ this is reachable over `POST /chat` but not yet from in game.
 Two directions:
 
 - **Game → Agent:** the mod exposes the game state over an HTTP API, which the
-  MCP server wraps as tools. Both agents call those tools — CyberJu all of them,
-  the spouse a subset — to ground what they say in the actual farm.
+  MCP server wraps as tools. All three agents call those tools — CyberJu all of
+  them, the spouse and the villager a shared subset — to ground what they say in
+  the actual farm.
 - **Agent → Game:** the mod POSTs to the agent's `/chat` endpoint and writes the
-  reply back into the game (chat box for CyberJu, dialogue box for the spouse).
+  reply back into the game (chat box for CyberJu, dialogue box for the spouse
+  and for villagers).
 
 ## Requirements
 
@@ -233,7 +264,8 @@ uv run python -m stardew_agent.test_mcp
   "character": "Haley",
   "message": "今天下午你在做什么？",
   "thread_id": "haley-spring-12",
-  "language": "zh"
+  "language": "zh",
+  "is_spouse": true
 }
 ```
 
@@ -243,11 +275,22 @@ uv run python -m stardew_agent.test_mcp
 | `message` | What the player said |
 | `thread_id` | The conversation this message belongs to; state is kept per thread |
 | `language` | `en` (default) or `zh`; picks the prompt set, see [Language](#language) |
+| `is_spouse` | Required. Whether that NPC is the farmer's spouse or roommate; picks the skill |
 
 `character` is either `CyberJu` (the tool-using assistant) or the name of an
-NPC with a character document, which is answered as the player's spouse.
+NPC with a character document, which is answered as the player's spouse when
+`is_spouse` is true and as an ordinary villager when it is false.
 The name is matched case-insensitively against
 `src/stardew_agent/assets/character/`, and an unknown name returns `404`.
+
+`is_spouse` has no default on purpose. Guessing `false` would answer the
+farmer's own spouse in the villager persona, which reads as a slightly off
+character rather than as a bug; a missing field fails with `422` instead.
+`CyberJu` carries it too, but is matched by name first and ignores it.
+
+Agents are cached per `(is_spouse, character)` pair, so the same villager met
+as a spouse in one save and as a neighbour in another keeps two separate
+histories.
 
 The reply carries the same `character` and the answer in `message`. A spouse
 answers in the dialogue format the mod parses:
@@ -281,12 +324,14 @@ src/stardew_agent/
 ├── api.py            # FastAPI /chat dispatcher
 ├── agents/
 │   ├── butler.py     # CyberJu — ReAct loop with all MCP tools
-│   └── spouse.py     # Spouse — ReAct loop with a subset of MCP tools
+│   ├── spouse.py     # Spouse — ReAct loop with a subset of MCP tools
+│   └── villager.py   # Villager — the same subset, a different skill
 ├── assets/
 │   ├── character/    # who someone is, one file per NPC
 │   │   └── zh/       #   ...and the same files, per language
 │   └── skills/       # how to behave in a mode, one dir per mode
-│       └── spouse/zh/
+│       ├── spouse/zh/
+│       └── villagers/zh/
 ├── persona.py        # loads character + skill, assembles the prompt
 ├── prompts.py        # CYBERJU_PROMPTS, DIALOGUE_FORMAT_CONTRACTS, per language
 ├── mcp_client.py     # MCP stdio client -> stardew-mcp-server
