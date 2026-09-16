@@ -20,7 +20,7 @@ CyberJu is a tool-using agent. It reads the live game state through MCP tools
 grounded in what is actually happening on the farm.
 
 - Graph: `src/stardew_agent/agents/butler.py`
-- Prompt: `CYBERJU_PROMPT` in `src/stardew_agent/prompts.py`
+- Prompt: `CYBERJU_PROMPTS` in `src/stardew_agent/prompts.py`, one per language
 - In game: type `cj <message>` in the chat box to talk to it
 - Style: concise, calm, slightly formal; 1–3 short points
 
@@ -60,7 +60,7 @@ more than one mode.
 | --- | --- | --- |
 | Character | `src/stardew_agent/assets/character/<name>.md` | who someone is — identity, interests, relationships |
 | Skill | `src/stardew_agent/assets/skills/<skill>/SKILL.md` | how to behave in a mode, whoever you are |
-| Format contract | `DIALOGUE_FORMAT_CONTRACT` in `prompts.py` | how to emit the reply the mod parses |
+| Format contract | `DIALOGUE_FORMAT_CONTRACTS` in `prompts.py` | how to emit the reply the mod parses |
 
 They are joined character → skill → contract, so the output contract sits
 closest to where generation starts.
@@ -94,7 +94,61 @@ remember earlier conversations.
 No code change is needed — `POST /chat` resolves any name that has a document
 and returns `404` for any that does not.
 
+To add a language, put the translated document in a directory named after it,
+beside the English original (`assets/character/zh/haley.md`). See
+[Language](#language).
+
 The markdown is read on every request, so edits take effect without a restart.
+
+## Language
+
+There is one prompt set per language, and nothing is translated. A message goes
+to the agent in the language it was written, and the reply comes back in that
+language because the prompt asked for it in that language:
+
+```text
+Chinese in ──► Chinese prompt ──► agent ──► Chinese out
+  English in ──► English prompt ──► agent ──► English out
+```
+
+Send `"language": "zh"` and the Chinese set is used end to end: the CyberJu
+prompt, the character document, the skill document, and the format contract.
+Only the primary subtag matters, so `zh`, `zh-CN`, `zh-Hans` and `zh-TW` all
+resolve to `zh`. Anything without a set of its own resolves to English, which is
+also the default.
+
+Writing the reply in Chinese directly, rather than in English and rendering it
+afterwards, is the point. A character's voice is a property of the character,
+and phrasing written for Chinese reads as that character rather than as a
+faithful copy of someone else's sentence. It also makes a Chinese reply a
+single model call.
+
+Two things to know:
+
+- A translated document is a sibling of the English one, under a directory named
+  after the language (`assets/character/zh/haley.md`). Each document resolves
+  independently and a missing translation falls back to English with a warning,
+  so a character can ship in one language and be translated later.
+- A thread's history is in whatever language it was written in. Switching
+  language mid-thread does not rewrite the earlier turns, and the system prompt
+  is only sent on the first turn of a thread, so a thread opened in English
+  keeps answering in English. Start a new `thread_id` to change language.
+
+The wire format is the one thing that does not change with the language. The mod
+parses the reply by `- ` and `% `, so both prompt sets use the same ASCII
+markers, and the Chinese contract says so explicitly — a model writing Chinese
+would otherwise reach for the full-width `－` and `％`, which the mod would not
+recognise.
+
+The Chinese set was written against the Chinese localisation shipped with the
+game and ValleyTalk's `i18n/zh.json`, so names and register match what a Chinese
+player already reads in game — 鹈鹕镇 for Pelican Town, 农夫 for the farmer,
+花舞节 for the Flower Dance. Keep that vocabulary when adding a Chinese
+document; a prompt that calls the town 鹈鹕镇 and a character doc that calls it
+something else reads as two different games.
+
+The mod sets the language for the session and does not currently send it, so
+this is reachable over `POST /chat` but not yet from in game.
 
 ## Architecture
 
@@ -175,17 +229,50 @@ uv run python -m stardew_agent.test_mcp
 `POST http://127.0.0.1:8000/chat`
 
 ```json
-{ "character": "CyberJu", "message": "what should I do today?" }
+{
+  "character": "Haley",
+  "message": "今天下午你在做什么？",
+  "thread_id": "haley-spring-12",
+  "language": "zh"
+}
 ```
 
-```json
-{ "character": "Haley", "message": "..." }
-```
+| Field | Description |
+| --- | --- |
+| `character` | `CyberJu`, or the name of an NPC with a character document |
+| `message` | What the player said |
+| `thread_id` | The conversation this message belongs to; state is kept per thread |
+| `language` | `en` (default) or `zh`; picks the prompt set, see [Language](#language) |
 
 `character` is either `CyberJu` (the tool-using assistant) or the name of an
 NPC with a character document, which is answered as the player's spouse.
 The name is matched case-insensitively against
 `src/stardew_agent/assets/character/`, and an unknown name returns `404`.
+
+The reply carries the same `character` and the answer in `message`. A spouse
+answers in the dialogue format the mod parses:
+
+```json
+{
+  "character": "Haley",
+  "message": "- I spent most of the afternoon taking photos.\n% That sounds fun.\n% What did you take pictures of?\n% Tell me more."
+}
+```
+
+The first line, starting with `- `, is what the character says. The lines
+starting with `% ` are replies the player can pick from. CyberJu answers in
+plain prose instead, since its reply goes to the chat box rather than the
+dialogue box.
+
+With `"language": "zh"` the same shape comes back in Chinese, because the same
+contract was given in Chinese and the markers are ASCII in both:
+
+```json
+{
+  "character": "Haley",
+  "message": "- 今天下午我都在镇上拍照，光线特别好。\n% 拍的什么？\n% 听起来很有意思。\n% 下次带我一起去。"
+}
+```
 
 ## Project layout
 
@@ -197,9 +284,11 @@ src/stardew_agent/
 │   └── spouse.py     # Spouse — ReAct loop with a subset of MCP tools
 ├── assets/
 │   ├── character/    # who someone is, one file per NPC
+│   │   └── zh/       #   ...and the same files, per language
 │   └── skills/       # how to behave in a mode, one dir per mode
+│       └── spouse/zh/
 ├── persona.py        # loads character + skill, assembles the prompt
-├── prompts.py        # CYBERJU_PROMPT, DIALOGUE_FORMAT_CONTRACT
+├── prompts.py        # CYBERJU_PROMPTS, DIALOGUE_FORMAT_CONTRACTS, per language
 ├── mcp_client.py     # MCP stdio client -> stardew-mcp-server
 ├── model.py          # LLM client
 └── config.py         # .env settings

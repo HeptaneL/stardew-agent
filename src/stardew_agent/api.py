@@ -5,7 +5,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from stardew_agent.agents.butler import create_butler
 from stardew_agent.agents.spouse import create_spouse
 from stardew_agent.persona import PersonaNotFound, spouse_prompt
-from stardew_agent.prompts import CYBERJU_PROMPT
+from stardew_agent.prompts import CYBERJU_PROMPTS, resolve_language
 import logging
 
 logging.basicConfig(
@@ -22,6 +22,7 @@ class ChatRequest(BaseModel):
     character: str
     message: str
     thread_id: str
+    language: str = "en"
 
 class ChatResponse(BaseModel):
     character: str
@@ -35,12 +36,18 @@ async def get_spouse_agent(character: str):
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
+    # The language picks a prompt set, and the message goes to the agent as it
+    # was written. Nothing is translated: a Chinese prompt is what makes the
+    # reply Chinese, so the character's voice is written once rather than
+    # written in English and rendered again.
+    language = resolve_language(request.language)
+
     if request.character == "CyberJu":
         agent = await create_butler()
         result = await agent.ainvoke(
             {
                 "messages": [
-                    SystemMessage(CYBERJU_PROMPT),
+                    SystemMessage(CYBERJU_PROMPTS[language]),
                     HumanMessage(request.message)
                 ]
             }
@@ -56,7 +63,7 @@ async def chat(request: ChatRequest):
     # Not CyberJu, so treat the name as a character sheet and talk to them as
     # the player's spouse. Adding a character means adding one markdown file.
     try:
-        system_prompt = spouse_prompt(request.character)
+        system_prompt = spouse_prompt(request.character, language)
     except PersonaNotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -86,6 +93,7 @@ async def chat(request: ChatRequest):
     )
     response = result["messages"][-1]
     content = format_spouse_reply(response.content)
+
     return ChatResponse(
         character=request.character,
         message=content,
@@ -95,8 +103,17 @@ def sanitize_response(text: str) -> str:
     return text.replace("*", "")
 
 
+# Both the ASCII pairs and the ones a Chinese reply is likely to arrive in. The
+# prompt asks for no quotation marks at all, but a model that wraps the line
+# anyway should not have the quotes land in the dialogue box.
+_QUOTE_PAIRS = {'"': '"', "'": "'", "“": "”", "‘": "’", "「": "」", "『": "』"}
+
+
 def _strip_wrapping_quotes(text: str) -> str:
-    return text.strip().strip('"').strip()
+    stripped = text.strip()
+    while len(stripped) >= 2 and _QUOTE_PAIRS.get(stripped[0]) == stripped[-1]:
+        stripped = stripped[1:-1].strip()
+    return stripped
 
 
 def format_spouse_reply(text: str) -> str:
