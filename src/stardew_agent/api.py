@@ -18,6 +18,8 @@ logging.basicConfig(
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
 )
 
+logger = logging.getLogger(__name__)
+
 
 app = FastAPI()
 
@@ -63,6 +65,7 @@ async def chat(request: ChatRequest):
     # was written. Nothing is translated: a Chinese prompt is what makes the
     # reply Chinese, so the character's voice is written once rather than
     # written in English and rendered again.
+    logger.info("LLM request: %r", request)
     language = resolve_language(request.language)
 
     if request.character == "CyberJu":
