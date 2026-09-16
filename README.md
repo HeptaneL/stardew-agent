@@ -30,8 +30,15 @@ grounded in what is actually happening on the farm.
 ### Spouse — living dialogue
 
 The Spouse agent replaces the farmer's spouse's scripted dialogue with something
-generated on the spot. It keeps the character's personality and memories, but is
-no longer limited to the lines written for her.
+generated on the spot. It keeps the character's personality, but is no longer
+limited to the lines written for her.
+
+It is a tool-using agent too, but on a shorter leash than CyberJu: it sees only
+the lookups a person living in the valley would plausibly make — the date and
+today's events, her household, how everyone stands with the farmer, where the
+farmer is, and what the farmer has recently been doing. The calendar and
+birthday tools stay with CyberJu, whose job is planning the day rather than
+living it. The allowlist is `SPOUSE_TOOLS` in `src/stardew_agent/mcp_client.py`.
 
 - Graph: `src/stardew_agent/agents/spouse.py`
 - Prompt: assembled by `src/stardew_agent/persona.py` from a character document
@@ -66,16 +73,16 @@ These were seeded from the
 separate experimental space. The copies here are what actually runs, and they
 are **not** kept in sync with it — edit them here.
 
-### Not wired up yet
+### Still not wired up: memory
 
-The spouse skill used to describe looking things up through memory and game
-tools. Neither exists on this path yet: `agents/spouse.py` binds no tools, and
-there is no memory store. Rather than asking for capabilities that are not
-there, the skill now states plainly that the character does not remember earlier
-conversations and does not know what the player has been doing today.
+Game tools landed, so the spouse skill's `## Use of Context` now describes what
+she can look up. Conversation memory did not, and it is a separate thing: the
+tools report on the farm and the day, not on what the two of you said to each
+other last week. The skill therefore still says plainly that she does not
+remember earlier conversations.
 
-When tools or memory do land, these are the sections to revisit:
-`## Use of Context` and `## Relationship Continuity` in
+`## Relationship Continuity` and the paragraph about not remembering in
+`## Use of Context` are the sections to revisit when a memory store lands, in
 `assets/skills/spouse/SKILL.md`.
 
 ### Adding a character
@@ -117,7 +124,8 @@ The markdown is read on every request, so edits take effect without a restart.
 Two directions:
 
 - **Game → Agent:** the mod exposes the game state over an HTTP API, which the
-  MCP server wraps as tools. CyberJu calls those tools to reason about the farm.
+  MCP server wraps as tools. Both agents call those tools — CyberJu all of them,
+  the spouse a subset — to ground what they say in the actual farm.
 - **Agent → Game:** the mod POSTs to the agent's `/chat` endpoint and writes the
   reply back into the game (chat box for CyberJu, dialogue box for the spouse).
 
@@ -185,8 +193,8 @@ The name is matched case-insensitively against
 src/stardew_agent/
 ├── api.py            # FastAPI /chat dispatcher
 ├── agents/
-│   ├── butler.py     # CyberJu — ReAct loop with MCP tools
-│   └── spouse.py     # Spouse — single-node dialogue graph
+│   ├── butler.py     # CyberJu — ReAct loop with all MCP tools
+│   └── spouse.py     # Spouse — ReAct loop with a subset of MCP tools
 ├── assets/
 │   ├── character/    # who someone is, one file per NPC
 │   └── skills/       # how to behave in a mode, one dir per mode

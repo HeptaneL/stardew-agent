@@ -4,6 +4,22 @@ from stardew_agent.config import settings
 
 MCP_ROOT = Path(settings.stardew_mcp_path) / "stardew-mcp-server"
 
+# The spouse is a person in the valley, not a farm assistant, so she gets only
+# the lookups she would plausibly make: her own household, how she and the
+# player stand with everyone, where the player is and what the day has been
+# like. The calendar and birthday lookups stay with CyberJu, whose job is
+# planning the day rather than living it.
+SPOUSE_TOOLS = frozenset(
+    {
+        "get_current_date",
+        "get_todays_events",
+        "get_household",
+        "get_relationship",
+        "get_current_state",
+        "get_recent_activity",
+    }
+)
+
 client = MultiServerMCPClient(
     {
         "stardew": {
@@ -28,6 +44,11 @@ client = MultiServerMCPClient(
 
 async def get_tools():
     return await client.get_tools()
+
+async def get_spouse_tools():
+    """The subset of the server's tools the spouse persona may use."""
+    tools = await get_tools()
+    return [tool for tool in tools if tool.name in SPOUSE_TOOLS]
 
 #if __name__ == "__main__":
 #    import asyncio

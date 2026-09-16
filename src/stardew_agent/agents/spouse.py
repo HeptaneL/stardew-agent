@@ -1,10 +1,12 @@
-from typing import Annotated
+from typing import Annotated, Literal
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
+from langgraph.prebuilt import ToolNode
 from langchain_core.messages import BaseMessage
 from typing_extensions import TypedDict
 
 from stardew_agent.model import llm
+from stardew_agent.mcp_client import get_spouse_tools
 import logging
 
 logger = logging.getLogger(__name__)
@@ -14,7 +16,9 @@ class SpouseState(TypedDict):
 
 
 async def create_spouse():
-    model = llm
+    tools = await get_spouse_tools()
+
+    model = llm.bind_tools(tools=tools)
 
     async def call_model(state: SpouseState):
         response = await model.ainvoke(state["messages"])
@@ -22,9 +26,19 @@ async def create_spouse():
         logger.info("LLM response: %r", response.content)
         return {"messages": [response]}
 
+    def should_continue(state: SpouseState) -> Literal["tools", END]:
+        last_message = state["messages"][-1]
+
+        if getattr(last_message, "tool_calls", None):
+            return "tools"
+        return END
+
     graph = StateGraph(SpouseState)
+
     graph.add_node("agent", call_model)
+    graph.add_node("tools", ToolNode(tools=tools))
     graph.add_edge(START, "agent")
-    graph.add_edge("agent", END)
+    graph.add_conditional_edges("agent", should_continue)
+    graph.add_edge("tools", "agent")
 
     return graph.compile()
