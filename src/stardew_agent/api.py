@@ -16,13 +16,22 @@ logging.basicConfig(
 
 app = FastAPI()
 
+spouse_agents = {}
+
 class ChatRequest(BaseModel):
     character: str
     message: str
+    thread_id: str
 
 class ChatResponse(BaseModel):
     character: str
     message: str
+
+async def get_spouse_agent(character: str):
+    if character not in spouse_agents:
+        spouse_agents[character] = await create_spouse()
+
+    return spouse_agents[character]
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
@@ -51,15 +60,29 @@ async def chat(request: ChatRequest):
     except PersonaNotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-    agent = await create_spouse()
+    agent = await get_spouse_agent(request.character)
+
+    config = {
+        "configurable": {
+            "thread_id": request.thread_id,
+        }
+    }
+
+    state = await agent.aget_state(config)
+
+    if state.values:
+        messages = [
+            HumanMessage(request.message)
+        ]
+    else:
+        messages = [
+            SystemMessage(system_prompt),
+            HumanMessage(request.message),
+        ]
 
     result = await agent.ainvoke(
-        {
-            "messages": [
-                SystemMessage(system_prompt),
-                HumanMessage(request.message),
-            ]
-        }
+        {"messages": messages},
+        config = config,
     )
     response = result["messages"][-1]
     content = format_spouse_reply(response.content)

@@ -3,6 +3,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 from langchain_core.messages import BaseMessage
+from langgraph.checkpoint.memory import InMemorySaver
 from typing_extensions import TypedDict
 
 from stardew_agent.model import llm
@@ -10,6 +11,7 @@ from stardew_agent.mcp_client import get_spouse_tools
 import logging
 
 logger = logging.getLogger(__name__)
+
 
 class SpouseState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
@@ -41,4 +43,8 @@ async def create_spouse():
     graph.add_conditional_edges("agent", should_continue)
     graph.add_edge("tools", "agent")
 
-    return graph.compile()
+    checkpoint = InMemorySaver()
+
+    return graph.compile(
+        checkpointer=checkpoint
+    )
