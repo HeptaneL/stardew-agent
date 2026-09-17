@@ -7,6 +7,7 @@ from stardew_agent.agents.spouse import create_spouse
 from stardew_agent.agents.villager import create_villager
 from stardew_agent.persona import (
     PersonaNotFound,
+    bulter_prompt,
     spouse_prompt,
     villager_prompt,
 )
@@ -28,9 +29,10 @@ app = FastAPI()
 # and the name alone cannot say.
 SPOUSE = "spouse"
 VILLAGER = "villager"
+BULTER = "bulter"
 
-_PROMPTS = {SPOUSE: spouse_prompt, VILLAGER: villager_prompt}
-_AGENT_FACTORIES = {SPOUSE: create_spouse, VILLAGER: create_villager}
+_PROMPTS = {SPOUSE: spouse_prompt, VILLAGER: villager_prompt, BULTER: bulter_prompt}
+_AGENT_FACTORIES = {SPOUSE: create_spouse, VILLAGER: create_villager, BULTER: create_butler}
 
 # One graph per (mode, character), so the same villager talked to as a spouse in
 # one save and as a neighbour in another keeps two separate histories. Each graph
@@ -67,31 +69,16 @@ async def chat(request: ChatRequest):
     # written in English and rendered again.
     logger.info("LLM request: %r", request)
     language = resolve_language(request.language)
+    config = {
+        "configurable": {
+            "thread_id": request.thread_id,
+        }
+    }
 
     if request.character == "CyberJu":
-        agent = await create_butler()
-        result = await agent.ainvoke(
-            {
-                "messages": [
-                    SystemMessage(CYBERJU_PROMPTS[language]),
-                    HumanMessage(request.message)
-                ]
-            }
-        )
-
-        response = result["messages"][-1]
-        content = sanitize_response(response.content)
-
-        return ChatResponse(
-            character=request.character,
-            message=content,
-        )
-    # Not CyberJu, so treat the name as a character sheet. Which skill is added
-    # to that sheet is the one thing the two modes disagree on: the same person
-    # is spoken to as the player's spouse or as an ordinary villager, and the
-    # rest of the turn — agent, memory, reply format — is identical either way.
-    # Adding a character means adding one markdown file.
-    kind = SPOUSE if request.is_spouse else VILLAGER
+        kind = BULTER
+    else:
+        kind = SPOUSE if request.is_spouse else VILLAGER
 
     try:
         system_prompt = _PROMPTS[kind](request.character, language)
@@ -99,12 +86,6 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     agent = await get_character_agent(kind, request.character)
-
-    config = {
-        "configurable": {
-            "thread_id": request.thread_id,
-        }
-    }
 
     state = await agent.aget_state(config)
 
@@ -130,8 +111,10 @@ async def chat(request: ChatRequest):
         message=content,
     )
 
-def sanitize_response(text: str) -> str:
-    return text.replace("*", "")
+def sanitize_response(orignal_text: str) -> str:
+    text = orignal_text.replace("*", "") 
+    text = text.replace("%","%")
+    return text
 
 
 # Both the ASCII pairs and the ones a Chinese reply is likely to arrive in. The

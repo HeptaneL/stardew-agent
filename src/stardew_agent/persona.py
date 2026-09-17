@@ -30,6 +30,7 @@ import logging
 from pathlib import Path
 
 from stardew_agent.prompts import (
+    CYBERJU_PROMPTS,
     DEFAULT_LANGUAGE,
     DIALOGUE_FORMAT_CONTRACTS,
 )
@@ -165,3 +166,8 @@ def villager_prompt(character_name: str, language: str = DEFAULT_LANGUAGE) -> st
     another, and the same person can be met either way.
     """
     return character_prompt(character_name, VILLAGER_SKILL, language)
+
+def bulter_prompt(character_name: str, language: str = DEFAULT_LANGUAGE) -> str:
+    """
+    """
+    return CYBERJU_PROMPTS[language]
