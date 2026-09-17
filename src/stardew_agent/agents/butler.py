@@ -7,6 +7,7 @@ from typing_extensions import TypedDict
 from langgraph.checkpoint.memory import InMemorySaver
 from stardew_agent.model import llm
 from stardew_agent.mcp_client import get_tools
+from stardew_agent.tools import LOCAL_TOOLS
 import logging
 
 logger = logging.getLogger(__name__)
@@ -17,7 +18,10 @@ class ButlerState(TypedDict):
 
 
 async def create_butler():
-    tools = await get_tools()
+    # The MCP tools report the valley as it is right now; the local ones read
+    # the documents that ship with the agent. CyberJu gets both, because
+    # answering "what should I give Evelyn" needs the state and the person.
+    tools = [*await get_tools(), *LOCAL_TOOLS]
 
     model = llm.bind_tools(tools=tools)
 

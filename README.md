@@ -70,6 +70,17 @@ CyberJu 是一个会用工具的 Agent。它在回答之前通过 MCP 工具读�
 - 游戏内：在聊天框输入 `cj <消息>` 与它对话
 - 风格：简洁、沉稳，1–3 个短条目
 
+除了 MCP 工具，CyberJu 还带一个本地工具 `read_character_profile`
+（`src/stardew_agent/tools.py`），用来查某位村民的角色文档 —— 身份、兴趣、人际
+关系。所以「艾芙琳喜欢什么礼物」这类问题，它会自己去读 `evelyn.md`，而不是
+凭印象回答。这个工具留在 Python 这一侧，是因为文档装在 Agent 里，MCP Server
+那个独立进程从来看不到它们。
+
+工具接收的是名字，不是文件名，所以 `Evelyn`、`evelyn`、`艾芙琳` 都能找到
+`evelyn.md`：先按文件名匹配，匹配不上再逐份文档比对标题，因此模型不必先知道
+中文名对应的英文文件名。`language` 参数决定读哪一份译文，按农夫当前的语言来
+给；不给的话，用名字是哪份文档给的（`艾芙琳` 来自 `zh/`）作为线索。
+
 <img width="1512" height="982" alt="Screenshot 2026-09-12 at 5 16 55 PM" src="https://github.com/user-attachments/assets/faab78a1-07a7-4616-9588-1b2b0d851a11" />
 
 
@@ -442,6 +453,7 @@ src/stardew_agent/
 ├── persona.py        # 读取角色 + 技能，组装提示词
 ├── prompts.py        # CYBERJU_PROMPTS、DIALOGUE_FORMAT_CONTRACTS，按语言
 ├── mcp_client.py     # MCP stdio 客户端 -> stardew-mcp-server
+├── tools.py          # 本地工具：read_character_profile 读取角色文档
 ├── model.py          # LLM 客户端
 └── config.py         # .env 配置
 ```
