@@ -90,6 +90,10 @@ CyberJu，因为它的工作是安排一天，而不是过日子。这份白名�
 - 游戏内：按住 `Alt` 点击你的配偶，输入你想说的话，她会给出几个可选回复
 - 风格：一到两句自然的句子，不使用 Markdown
 
+
+https://github.com/user-attachments/assets/9047a6b1-f1a6-4d09-a007-448b909d4657
+
+
 <img width="3024" height="1964" alt="image" src="https://github.com/user-attachments/assets/21f76ce8-45a5-457c-b8f6-31d2affad136" />
 
 
