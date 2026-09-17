@@ -104,7 +104,7 @@ async def chat(request: ChatRequest):
         config = config,
     )
     response = result["messages"][-1]
-    content = format_dialogue_reply(response.content)
+    content = format_dialogue_reply(kind, response.content)
 
     return ChatResponse(
         character=request.character,
@@ -130,7 +130,7 @@ def _strip_wrapping_quotes(text: str) -> str:
     return stripped
 
 
-def format_dialogue_reply(text: str) -> str:
+def format_dialogue_reply(kind, text: str) -> str:
     """
     Reduce the model's reply to the shape the mod parses: one "- " line for
     what the character says, followed by "% " lines for the farmer's options.
@@ -143,6 +143,8 @@ def format_dialogue_reply(text: str) -> str:
     format entirely, so the farmer still sees something.
     """
     cleaned = sanitize_response(text).replace("`", "")
+    if kind == BULTER:
+        return cleaned
 
     line: str | None = None
     options: list[str] = []
