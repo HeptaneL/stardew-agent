@@ -126,13 +126,16 @@ def read_character_profile(
     ] = "",
 ) -> str:
     """
-    Read a villager's character profile: who they are, what they like, their
+    Read a villager's character profile: who they are, their interests, their
     relationships, and how they have changed.
 
-    Call this before answering a question about a specific villager — what gift
-    they like, what they are interested in, who they are close to — instead of
+    Call this before answering a question about a specific villager — who they
+    are, what they are interested in, who they are close to — instead of
     guessing. The profile is background, not a script: use the part the question
     is about.
+
+    This document does not hold the game's exact gift tastes. For what to give
+    someone, use ``get_gift_tastes`` and ``suggest_gift`` instead.
     """
     found = _find(character)
 

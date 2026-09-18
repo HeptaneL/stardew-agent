@@ -18,9 +18,10 @@ class ButlerState(TypedDict):
 
 
 async def create_butler():
-    # The MCP tools report the valley as it is right now; the local ones read
-    # the documents that ship with the agent. CyberJu gets both, because
-    # answering "what should I give Evelyn" needs the state and the person.
+    # The MCP tools report the valley as it is right now — including the gift
+    # tools, which read the game's own taste data rather than a document. The
+    # local tool reads the documents that ship with the agent, so CyberJu gets
+    # both: the state and the person.
     tools = [*await get_tools(), *LOCAL_TOOLS]
 
     model = llm.bind_tools(tools=tools)

@@ -122,7 +122,7 @@ CyberJu 是工具最全的那个。它在回答之前通过 MCP 工具读实时�
 - 图：`src/stardew_agent/agents/butler.py`
 - 提示词：`src/stardew_agent/prompts.py` 中的 `CYBERJU_PROMPTS`，每种语言一份
 - 游戏内：聊天框输入 `cj <消息>`
-- 工具：全部 12 个 MCP 工具 + `read_character_profile`
+- 工具：全部 15 个 MCP 工具 + `read_character_profile`
 - 风格：简洁、沉稳，1–3 个短条目
 
 可用的 MCP 工具：
@@ -132,13 +132,16 @@ get_current_date        get_todays_events       get_week_birthdays
 get_birthdays_on_day    get_events_on_day       get_month_calendar
 get_household           get_relationship        get_current_state
 get_recent_activity     get_recent_events       check_health
+get_npc_location        get_gift_tastes         suggest_gift
 ```
 
 除了 MCP 工具，CyberJu 还带一个本地工具 `read_character_profile`
 （`src/stardew_agent/tools.py:112`），用来查某位村民的角色文档 —— 身份、兴趣、
-人际关系。所以「艾芙琳喜欢什么礼物」这类问题，它会自己去读 `evelyn.md`，而不是
-凭印象回答。这个工具留在 Python 这一侧，是因为文档装在 Agent 里，MCP Server
-那个独立进程从来看不到它们。
+人际关系。它回答的是「这个人是谁」，不是「该送他什么」：文档里没有游戏的礼物
+喜好表。送礼的问题由 MCP 侧回答 —— `get_gift_tastes` 给出喜欢和讨厌什么，
+`suggest_gift` 扫玩家背包和箱子、按游戏自己的评分推荐现在该送什么 —— 数据都来自
+游戏的 `Data/NPCGiftTastes`。本地工具留在 Python 这一侧，是因为文档装在 Agent
+里，MCP Server 那个独立进程从来看不到它们。
 
 工具接收的是名字，不是文件名，所以 `Evelyn`、`evelyn`、`艾芙琳` 都能找到
 `evelyn.md`：先按文件名匹配（`tools.py:84`），匹配不上再逐份文档比对首行标题
