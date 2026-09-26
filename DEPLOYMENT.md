@@ -39,6 +39,7 @@ Terraform 发布到宿主机 8000 端口的 agent。
 | CPU | Apple Silicon / Intel 均可 | 本项目的 Docker 镜像和 Terraform 均无架构相关分支；Docker Desktop 会自动选择 arm64 / amd64 |
 | Steam + Stardew Valley | 已安装并能正常启动 | 路径见下文 |
 | SMAPI | 4.0.0 或更高 | HelloStardew 的 `MinimumApiVersion` 是 `4.0.0` |
+| GMCM（Generic Mod Config Menu） | 已安装 | HelloStardew 的游戏内配置界面依赖它 |
 | Docker Desktop | 已安装并启动 | agent / MCP / Postgres 都跑在 Docker 里 |
 | Terraform | 已安装 | 当前没有 docker-compose 文件，编排用 Terraform |
 | Git | 已安装 | 用于 clone `stardew-agent` 和 `stardew-mcp-server` |
@@ -87,7 +88,9 @@ STARDEW_DIR="$HOME/Library/Application Support/Steam/steamapps/common/Stardew Va
 
 ---
 
-## 4. 安装 HelloStardew（GitHub Release，不 clone 源码）
+## 4. 安装 HelloStardew 与 GMCM
+
+### 4.1 HelloStardew（GitHub Release，不 clone 源码）
 
 1. 下载 Release `v0.1.0`：
 
@@ -119,8 +122,31 @@ Mods/
 4. 首次通过 SMAPI 启动游戏后，会自动生成
    `Mods/HelloStardew/config.json`。生成内容默认 `BindAddress` 为 `"+"`。
 
-> GMCM（Generic Mod Config Menu）是可选依赖，不装也能运行；它只提供游戏内
-> 修改配置的界面，不是 Agent 启动的硬依赖。
+### 4.2 GMCM（必需）
+
+HelloStardew 的游戏内配置界面由 GMCM 提供，请一并安装。
+
+1. 从 Nexus Mods 下载 Generic Mod Config Menu：
+   https://www.nexusmods.com/stardewvalley/mods/5098
+2. 解压后把 `GenericModConfigMenu` 文件夹放进 `Mods/`：
+
+```bash
+STARDEW_DIR="$HOME/Library/Application Support/Steam/steamapps/common/Stardew Valley/Contents/MacOS"
+cp -R GenericModConfigMenu "$STARDEW_DIR/Mods/"
+```
+
+3. 确认目录结构：
+
+```text
+Mods/
+├─ HelloStardew/
+│  ├─ manifest.json
+│  ├─ HelloStardew.dll
+│  └─ i18n/
+└─ GenericModConfigMenu/
+   ├─ manifest.json
+   └─ GenericModConfigMenu.dll
+```
 
 ---
 
@@ -156,8 +182,8 @@ Mods/
 | `AgentTimeoutSeconds` | `30` | 否 | 调 agent 的超时秒数 |
 | `OfferTypedResponse` | `true` | 否 | 是否提供“自己打字”选项 |
 
-> 没有安装 GMCM 时，手动改 `config.json` 后需要**重启游戏**才生效。
-> 使用 GMCM 修改则在关闭菜单时立即生效。
+> 需要修改配置时，在游戏内打开 GMCM → Hello Stardew；关闭菜单时立即生效，
+> 不需要重启游戏。
 
 ---
 
@@ -345,7 +371,7 @@ curl http://127.0.0.1:8788/health
 - 宿主机 curl 都失败：游戏 / SMAPI / HelloStardew 没启动或端口不对。
 - 宿主机 curl 成功，但 MCP 容器返回 404：检查 `config.json` 的
   `BindAddress` 是否为 `"+"`。如果不是，改成 `"+"` 后重启游戏。
-- 如果之前手动改过 `config.json`，没有 GMCM 时不会热生效，必须重启游戏。
+- 如果直接手动改过 `config.json`，必须重启游戏；用 GMCM 修改则关闭菜单立即生效。
 
 ### 8788 端口被占用
 

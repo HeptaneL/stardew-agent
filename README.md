@@ -342,22 +342,6 @@ uv run uvicorn stardew_agent.api:app --host 127.0.0.1 --port 8000
 uv run python -m stardew_agent.test_mcp
 ```
 
-## Docker / Terraform 部署
-
-完整的新用户部署步骤、环境要求、验证方法和常见问题见
-**[DEPLOYMENT.md](DEPLOYMENT.md)**。
-
-一句话概括：`terraform/` 用 Docker 启动 Postgres（checkpoint）、
-stardew-mcp-server（HTTP）和 stardew-agent（FastAPI），宿主机只需装
-Docker Desktop 和 Terraform。
-
-```bash
-cd terraform
-cp terraform.tfvars.example terraform.tfvars   # 填上 openai_api_key
-terraform init
-terraform apply
-```
-
 ## API
 
 `POST http://127.0.0.1:8000/chat`
