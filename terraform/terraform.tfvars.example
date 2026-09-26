@@ -3,6 +3,13 @@
 
 openai_api_key = "sk-..."
 
+# Docker daemon socket used by the Terraform provider. Empty (the default) uses
+# Docker Desktop's macOS socket (unix://$HOME/.docker/run/docker.sock), so you
+# usually don't need to set this. Override for other setups:
+# docker_host = "unix:///var/run/docker.sock"                     # Linux / default socket
+# docker_host = "unix:///Users/you/.colima/default/docker.sock"   # Colima
+# docker_host = "auto"                                            # fall back to DOCKER_HOST / provider default
+
 # postgres_user     = "stardew"
 # postgres_password = "change-me"
 # postgres_db       = "stardew"

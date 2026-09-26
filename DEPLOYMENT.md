@@ -43,6 +43,7 @@ Terraform 发布到宿主机 8000 端口的 agent。
 | Docker Desktop | 已安装并启动 | agent / MCP / Postgres 都跑在 Docker 里 |
 | Terraform | 已安装 | 当前没有 docker-compose 文件，编排用 Terraform |
 | Git | 已安装 | 用于 clone `stardew-agent` 和 `stardew-mcp-server` |
+| `stardew-mcp-server` 源码 | **必须 clone** | 与 `stardew-agent` 同一父目录（如 `~/stardew/`），否则 `terraform apply` 找不到 MCP 镜像的 build context |
 | Python | 宿主机**不需要** | 依赖装在 Docker 镜像内 |
 | PostgreSQL | 宿主机**不需要** | Postgres 由 Terraform 启动在 Docker 里 |
 
@@ -53,6 +54,12 @@ Terraform 发布到宿主机 8000 端口的 agent。
 ```bash
 docker version
 ```
+
+> **Docker 套接字说明**：新版 Docker Desktop 的 daemon socket 位于
+> `~/.docker/run/docker.sock`，不一定再创建 `/var/run/docker.sock` 软链。
+> 本项目 Terraform 已默认指向前者，**无需再手动 `export DOCKER_HOST`**。
+> 如果你的 Docker 运行在其他 socket（如 Linux 的 `/var/run/docker.sock`、
+> Colima 的 `~/.colima/default/docker.sock`），见第 8 节的 `docker_host` 变量。
 
 ### 安装 Terraform
 
@@ -220,6 +227,9 @@ base_url = "https://api.deepseek.com"
 
 ## 7. 获取 Agent 与 MCP Server 代码
 
+> **必须执行**：缺少 `stardew-mcp-server` 源码时，`terraform apply` 会因
+> 找不到 MCP 镜像的 build context（`../../stardew-mcp-server`）而直接失败。
+
 Terraform 会从**本地相邻目录**构建镜像，因此两个仓库必须放在同一父目录下：
 
 ```text
@@ -244,6 +254,19 @@ git clone https://github.com/HeptaneL/stardew-mcp-server.git
 ---
 
 ## 8. 用 Terraform 启动 Postgres + MCP Server + Agent
+
+Terraform 的 Docker provider 默认连接 `unix:///var/run/docker.sock`，但新版
+Docker Desktop 把 daemon 放在 `~/.docker/run/docker.sock`。本项目已通过
+`docker_host` 变量（默认 `unix://$HOME/.docker/run/docker.sock`）显式指定，
+所以**不需要**再 `export DOCKER_HOST`。若你的环境不同，在 `terraform.tfvars`
+里覆盖即可，例如 Linux 上：
+
+```hcl
+docker_host = "unix:///var/run/docker.sock"
+```
+
+> 开始前确认第 7 节的 `stardew-agent` 与 `stardew-mcp-server` 已 clone 到
+> 同一父目录（如 `~/stardew/`），否则 `terraform apply` 无法构建 MCP 镜像。
 
 ```bash
 cd ~/stardew/stardew-agent/terraform
@@ -273,6 +296,7 @@ terraform apply
 | `mcp_port` | `8001` | MCP 宿主机端口 |
 | `postgres_port` | `15432` | Postgres 宿主机端口 |
 | `postgres_user` / `postgres_password` / `postgres_db` | `stardew` / `stardew` / `stardew` | 仅容器内部使用 |
+| `docker_host` | `""`（自动使用 `unix://$HOME/.docker/run/docker.sock`） | Docker daemon socket；Linux 等环境改成 `unix:///var/run/docker.sock`，设为 `"auto"` 则回退到 `DOCKER_HOST` / provider 默认值 |
 
 确认三个容器都 healthy：
 
@@ -361,6 +385,29 @@ curl -s http://127.0.0.1:8000/chat \
 ---
 
 ## 11. 常见问题
+
+### `terraform apply` 报找不到 Docker daemon / `docker.sock`
+
+错误通常类似 `Cannot connect to the Docker daemon at unix:///var/run/docker.sock`。
+原因是新版 Docker Desktop 的 socket 在 `~/.docker/run/docker.sock`，不再保证
+`/var/run/docker.sock` 存在。本项目已默认处理，无需手动 `export DOCKER_HOST`。
+
+如果仍失败：
+
+1. 确认 Docker Desktop 已启动：`docker version`。
+2. 确认实际 socket：`docker context ls` 里当前 context 的 `DOCKER ENDPOINT`。
+3. 按实际 socket 在 `terraform.tfvars` 覆盖：
+
+```hcl
+# Linux / 默认 socket
+docker_host = "unix:///var/run/docker.sock"
+# Colima
+# docker_host = "unix:///Users/you/.colima/default/docker.sock"
+# 回退到 DOCKER_HOST / provider 默认值
+# docker_host = "auto"
+```
+
+4. 重新 `terraform init` 后 `terraform apply`。
 
 ### HelloStardew API 无法连接 / 容器返回 404
 

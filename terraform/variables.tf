@@ -1,3 +1,9 @@
+variable "docker_host" {
+  type        = string
+  default     = ""
+  description = "Docker daemon socket for the Terraform provider. Empty (default) uses Docker Desktop's macOS socket; set to \"auto\" to fall back to DOCKER_HOST / the provider default, or set an explicit URL such as unix:///var/run/docker.sock on Linux."
+}
+
 variable "postgres_user" {
   type        = string
   default     = "stardew"
