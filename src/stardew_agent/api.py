@@ -47,8 +47,8 @@ _AGENT_FACTORIES = {SPOUSE: create_spouse, VILLAGER: create_villager, BULTER: cr
 
 # One graph per (mode, character), so the same villager talked to as a spouse in
 # one save and as a neighbour in another keeps two separate histories. The graphs
-# share one Postgres checkpointer; the ``checkpoint_ns`` in each request config is
-# what keeps those histories apart.
+# share one Postgres checkpointer; the ``(kind, character)`` prefix folded into
+# each request's ``thread_id`` is what keeps those histories apart.
 character_agents = {}
 
 class ChatRequest(BaseModel):

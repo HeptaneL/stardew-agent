@@ -5,6 +5,8 @@
 
 不是套壳聊天框 —— Agent 通过 MCP 读实时游戏状态，回复写回游戏里的对话框和聊天框。
 
+> 面向新用户的从零部署步骤见 **[DEPLOYMENT.md](DEPLOYMENT.md)**。
+
 ## 游戏内交互
 
 按住 `Alt` 点击你的配偶，输入你想说的话，她当场给你几个可选回复：
@@ -342,23 +344,19 @@ uv run python -m stardew_agent.test_mcp
 
 ## Docker / Terraform 部署
 
-`terraform/` 把三个进程一起拉起来：Postgres（存 checkpoint）、stardew-mcp-server
-（HTTP 模式）、stardew-agent（FastAPI）。三者挂在同一个 Docker 网络里，agent 通过
-`http://mcp:8001/mcp` 连 MCP，通过 `postgres:5432` 连数据库；只有端口需要映射到宿主机。
+完整的新用户部署步骤、环境要求、验证方法和常见问题见
+**[DEPLOYMENT.md](DEPLOYMENT.md)**。
+
+一句话概括：`terraform/` 用 Docker 启动 Postgres（checkpoint）、
+stardew-mcp-server（HTTP）和 stardew-agent（FastAPI），宿主机只需装
+Docker Desktop 和 Terraform。
 
 ```bash
 cd terraform
-cp terraform.tfvars.example terraform.tfvars   # 填上 OPENAI_API_KEY 等真实值
+cp terraform.tfvars.example terraform.tfvars   # 填上 openai_api_key
 terraform init
 terraform apply
 ```
-
-默认端口：agent `8000`、MCP `8001`、Postgres `15432`（避开常见的本地 5432）。
-MCP 容器需要访问跑在宿主机的 HelloStardew，默认用
-`http://host.docker.internal:8788`。HelloStardew 的 `BindAddress` 必须设成 `+`
-（不是 `0.0.0.0`，`HttpListener` 只接受 `+` / `*` 通配符），否则它只接受
-`Host: 127.0.0.1` 的请求，容器通过 `host.docker.internal` 访问会得到 404。
-Linux 上如果 `host.docker.internal` 不解析，把 `stardew_api_url` 换成宿主机可路由的地址。
 
 ## API
 

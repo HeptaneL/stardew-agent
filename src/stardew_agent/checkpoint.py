@@ -1,8 +1,8 @@
 """Shared Postgres checkpointer for the LangGraph agents.
 
 One pool + one saver is created per process and reused by every compiled graph.
-Graphs stay isolated by ``checkpoint_ns`` (set from the API's ``(kind,
-character)`` key), so the same ``thread_id`` never bleeds across modes or
+Graphs stay isolated because the API folds ``(kind, character)`` into each
+request's ``thread_id``, so the same ``thread_id`` never bleeds across modes or
 characters even though they share the database.
 """
 
