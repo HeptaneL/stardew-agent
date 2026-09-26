@@ -1,0 +1,20 @@
+# Copy to terraform.tfvars and fill in the real values.
+# terraform.tfvars is git-ignored by convention; never commit secrets.
+
+openai_api_key = "sk-..."
+
+# postgres_user     = "stardew"
+# postgres_password = "change-me"
+# postgres_db       = "stardew"
+# postgres_port     = 15432
+
+# agent_port = 8000
+# mcp_port   = 8001
+
+# model    = "deepseek-flash"
+# base_url = "https://api.deepseek.com"
+
+# The HelloStardew mod runs on the host. On macOS/Windows Docker Desktop this
+# hostname resolves to the host; on Linux you may prefer a host network or a
+# reachable LAN address.
+# stardew_api_url = "http://host.docker.internal:8788"

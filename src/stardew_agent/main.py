@@ -12,7 +12,12 @@ async def main():
                 SystemMessage(SYSTEM_PROMPT),
                 HumanMessage("今天有什么重要的事情?")
             ]
-        }
+        },
+        config={
+            "configurable": {
+                "thread_id": "dev-main",
+            }
+        },
     )
     print(result["messages"][-1].content)
 

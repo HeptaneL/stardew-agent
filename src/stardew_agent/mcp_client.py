@@ -2,7 +2,7 @@ from pathlib import Path
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from stardew_agent.config import settings
 
-MCP_ROOT = Path(settings.stardew_mcp_path) / "stardew-mcp-server"
+_STDIO_MCP_ROOT = Path(settings.stardew_mcp_path) / "stardew-mcp-server"
 
 # A character is a person in the valley, not a farm assistant, so they get only
 # the lookups they would plausibly make: their household, how they and the
@@ -24,25 +24,45 @@ CHARACTER_TOOLS = frozenset(
     }
 )
 
+def _stdio_connection() -> dict:
+    """Run the MCP server as a subprocess over stdin/stdout."""
+    return {
+        "transport": "stdio",
+        "command": str(_STDIO_MCP_ROOT / ".venv/bin/python"),
+        "args": [
+            str(_STDIO_MCP_ROOT / "src/stardew_mcp_server/server.py"),
+        ],
+        "env": {
+            "STARDEW_API_URL": settings.stardew_api_url,
+            # The MCP SDK spawns the server with *only* this dict (it does
+            # not inherit the parent environment), so any NO_PROXY from the
+            # shell is lost. Without it httpx picks up the macOS system
+            # proxy and routes the local request through it, which answers
+            # HTTP 503. Keep localhost traffic direct.
+            "NO_PROXY": "localhost,127.0.0.1,::1",
+            "no_proxy": "localhost,127.0.0.1,::1",
+        },
+    }
+
+
+def _http_connection() -> dict:
+    """Connect to an already-running MCP server over Streamable HTTP."""
+    return {
+        "transport": "http",
+        "url": settings.stardew_mcp_url,
+    }
+
+
+def _stardew_connection() -> dict:
+    transport = settings.stardew_mcp_transport.lower()
+    if transport in {"http", "streamable-http", "streamable_http"}:
+        return _http_connection()
+    return _stdio_connection()
+
+
 client = MultiServerMCPClient(
     {
-        "stardew": {
-            "transport": "stdio",
-            "command": str(MCP_ROOT/".venv/bin/python"),
-            "args": [
-                str(MCP_ROOT/"src/stardew_mcp_server/server.py"),
-            ],
-            "env": {
-                "STARDEW_API_URL": settings.stardew_api_url,
-                # The MCP SDK spawns the server with *only* this dict (it does
-                # not inherit the parent environment), so any NO_PROXY from the
-                # shell is lost. Without it httpx picks up the macOS system
-                # proxy and routes the local request through it, which answers
-                # HTTP 503. Keep localhost traffic direct.
-                "NO_PROXY": "localhost,127.0.0.1,::1",
-                "no_proxy": "localhost,127.0.0.1,::1",
-            },
-        },
+        "stardew": _stardew_connection(),
     }
 )
 

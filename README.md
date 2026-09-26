@@ -313,8 +313,11 @@ English in ──► English prompt ──► agent ──► English out
 | `MODEL` | 模型名，例如 `deepseek-flash` |
 | `BASE_URL` | OpenAI 兼容的 base URL，例如 `https://api.deepseek.com` |
 | `OPENAI_API_KEY` | 上面那项的 API key |
-| `STARDEW_MCP_PATH` | 存放 `stardew-mcp-server` 的目录 |
+| `STARDEW_MCP_PATH` | 存放 `stardew-mcp-server` 的目录（仅 stdio 模式需要） |
 | `STARDEW_API_URL` | HelloStardew 的 HTTP API，例如 `http://127.0.0.1:8788` |
+| `DATABASE_URL` | Postgres 连接串，checkpoint 存在这里，例如 `postgresql://stardew:stardew@localhost:15432/stardew` |
+| `STARDEW_MCP_TRANSPORT` | `stdio`（默认）或 `http` / `streamable-http`；决定 agent 怎么连接 MCP server |
+| `STARDEW_MCP_URL` | HTTP 模式下 MCP server 的地址，例如 `http://127.0.0.1:8001/mcp` |
 
 ## 运行
 
@@ -336,6 +339,26 @@ uv run uvicorn stardew_agent.api:app --host 127.0.0.1 --port 8000
 ```bash
 uv run python -m stardew_agent.test_mcp
 ```
+
+## Docker / Terraform 部署
+
+`terraform/` 把三个进程一起拉起来：Postgres（存 checkpoint）、stardew-mcp-server
+（HTTP 模式）、stardew-agent（FastAPI）。三者挂在同一个 Docker 网络里，agent 通过
+`http://mcp:8001/mcp` 连 MCP，通过 `postgres:5432` 连数据库；只有端口需要映射到宿主机。
+
+```bash
+cd terraform
+cp terraform.tfvars.example terraform.tfvars   # 填上 OPENAI_API_KEY 等真实值
+terraform init
+terraform apply
+```
+
+默认端口：agent `8000`、MCP `8001`、Postgres `15432`（避开常见的本地 5432）。
+MCP 容器需要访问跑在宿主机的 HelloStardew，默认用
+`http://host.docker.internal:8788`。HelloStardew 的 `BindAddress` 必须设成 `+`
+（不是 `0.0.0.0`，`HttpListener` 只接受 `+` / `*` 通配符），否则它只接受
+`Host: 127.0.0.1` 的请求，容器通过 `host.docker.internal` 访问会得到 404。
+Linux 上如果 `host.docker.internal` 不解析，把 `stardew_api_url` 换成宿主机可路由的地址。
 
 ## API
 

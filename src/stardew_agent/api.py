@@ -1,8 +1,11 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from stardew_agent.agents.butler import create_butler
+from stardew_agent.checkpoint import get_checkpointer
 from stardew_agent.agents.spouse import create_spouse
 from stardew_agent.agents.villager import create_villager
 from stardew_agent.persona import (
@@ -22,7 +25,15 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    # Fail fast if Postgres is unreachable or the checkpoint schema can't be
+    # migrated, instead of serving the first chat and then 500-ing.
+    await get_checkpointer()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 # The two ways a named character can be met. Which one applies is the mod's call,
 # not ours: it is the side that can see whether the farmer married this person,
@@ -35,8 +46,9 @@ _PROMPTS = {SPOUSE: spouse_prompt, VILLAGER: villager_prompt, BULTER: bulter_pro
 _AGENT_FACTORIES = {SPOUSE: create_spouse, VILLAGER: create_villager, BULTER: create_butler}
 
 # One graph per (mode, character), so the same villager talked to as a spouse in
-# one save and as a neighbour in another keeps two separate histories. Each graph
-# carries its own checkpointer, which is what makes that separation hold.
+# one save and as a neighbour in another keeps two separate histories. The graphs
+# share one Postgres checkpointer; the ``checkpoint_ns`` in each request config is
+# what keeps those histories apart.
 character_agents = {}
 
 class ChatRequest(BaseModel):
@@ -69,16 +81,21 @@ async def chat(request: ChatRequest):
     # written in English and rendered again.
     logger.info("LLM request: %r", request)
     language = resolve_language(request.language)
-    config = {
-        "configurable": {
-            "thread_id": request.thread_id,
-        }
-    }
 
     if request.character == "CyberJu":
         kind = BULTER
     else:
         kind = SPOUSE if request.is_spouse else VILLAGER
+
+    # Graphs share one Postgres checkpointer, so the mode and character are
+    # folded into the thread_id. This preserves the old per-graph InMemorySaver
+    # isolation without using ``checkpoint_ns``, which LangGraph reserves for
+    # subgraph routing and would otherwise look up a subgraph named ``spouse``.
+    config = {
+        "configurable": {
+            "thread_id": f"{kind}:{request.character}:{request.thread_id}",
+        }
+    }
 
     try:
         system_prompt = _PROMPTS[kind](request.character, language)

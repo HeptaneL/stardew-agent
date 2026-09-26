@@ -4,7 +4,7 @@ from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 from langchain_core.messages import BaseMessage
 from typing_extensions import TypedDict
-from langgraph.checkpoint.memory import InMemorySaver
+from stardew_agent.checkpoint import get_checkpointer
 from stardew_agent.model import llm
 from stardew_agent.mcp_client import get_tools
 from stardew_agent.tools import LOCAL_TOOLS
@@ -47,7 +47,7 @@ async def create_butler():
     graph.add_conditional_edges("agent", should_continue)
     graph.add_edge("tools", "agent")
 
-    checkpoint = InMemorySaver()
+    checkpoint = await get_checkpointer()
 
     return graph.compile(
         checkpointer = checkpoint
