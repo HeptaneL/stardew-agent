@@ -7,6 +7,23 @@
 
 > 面向新用户的从零部署步骤见 **[DEPLOYMENT.md](DEPLOYMENT.md)**。
 
+## 目录
+
+- [游戏内交互](#游戏内交互)
+- [Agentic RAG：检索由 Agent 决定](#agentic-rag检索由-agent-决定)
+- [对话质量评估](#对话质量评估)
+- [记忆机制](#记忆机制)
+- [三个 Agent](#三个-agent)
+- [人格（Persona）的组装方式](#人格persona的组装方式)
+- [语言](#语言)
+- [架构](#架构)
+- [环境要求](#环境要求)
+- [配置](#配置)
+- [运行](#运行)
+- [API](#api)
+- [项目结构](#项目结构)
+- [致谢](#致谢)
+
 ## 游戏内交互
 
 按住 `Alt` 点击你的配偶，输入你想说的话，她当场给你几个可选回复：
@@ -499,6 +516,9 @@ src/stardew_agent/
   中文翻译。
 
 没有它，这里会从零开始摸一遍星露谷的对话系统。
+
+特别感谢 [JU4N66](https://github.com/JU4N66) 为 NPC 对话质量评估及相关工作
+所做的贡献。
 
 还要感谢 [SMAPI](https://smapi.io/)（Pathoschild）、Harmony，以及
 [Stardew Valley](https://www.stardewvalley.net/) 的作者 ConcernedApe。
