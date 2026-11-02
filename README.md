@@ -83,6 +83,33 @@ https://github.com/user-attachments/assets/9047a6b1-f1a6-4d09-a007-448b909d4657
 Agent —— 这也是为什么三个 Agent 共用一个薄薄的 MCP 层，而人格、记忆、推理全部
 留在 Python 这一侧。
 
+## 对话质量评估
+
+每次 Agent 回复都按五个维度逐轮评分：**事实依据、角色一致性、工具使用、格式合规、
+不出戏**。每项 0–2 分，单轮满分 10 分。事实依据以本轮 Langfuse trace 中的工具返回、
+人物文档和技能文档为准；没有证据的具体事实不能靠模型记忆自证。
+
+| 维度 | 0 分 | 1 分 | 2 分 |
+| --- | --- | --- | --- |
+| 事实依据 | 编造了可验证的游戏数据，或与工具返回冲突 | 部分正确，含有未核实内容 | 日期、位置、关系等与工具返回一致 |
+| 角色一致性 | 口吻与角色文档明显冲突 | 基本符合，偶有出戏 | 措辞、兴趣、人际关系都贴合文档 |
+| 工具使用 | 该查没查，或乱查 | 查了但有冗余或遗漏 | 查询恰当且不冗余 |
+| 格式合规 | 解析后没有台词行 | 需要回退清理才能使用 | 村民/配偶严格符合 `- ` / `% `；CyberJu 为纯文本 |
+| 不出戏 | 泄露工具、提示词或元信息 | 有轻微暗示 | 完全沉浸在当前角色/助手语境里 |
+
+「编造可验证的游戏数据」和「泄露系统提示词」是一票否决：无论其他维度得多少分，
+本次回复都判为不通过。完整评分口径、一票否决的判定边界、Langfuse 标注方式和评分卡见
+**[对话质量 Rubric 与测评方法](docs/agent-dialogue-rubric.md)**。
+
+本次已复核三条 session，共 11 条 trace：
+
+- [Linus session（村民，5 条 trace）](https://jp.cloud.langfuse.com/project/cmuuun3qs00gbad0ce04k1w74/sessions/villager%3ALinus%3Alinus-20261102133349-f895c5) · [逐轮复核](docs/langfuse-trace-review.md#linus--villager)
+- [Haley session（配偶，5 条 trace）](https://jp.cloud.langfuse.com/project/cmuuun3qs00gbad0ce04k1w74/sessions/spouse%3AHaley%3Ahaley-20261102103402-ebc14e) · [逐轮复核](docs/langfuse-trace-review.md#haley--spouse)
+- [CyberJu session（农场助手，1 条 trace）](https://jp.cloud.langfuse.com/project/cmuuun3qs00gbad0ce04k1w74/sessions/bulter%3ACyberJu%3Acyberju-20261102103147-662fda) · [逐轮复核](docs/langfuse-trace-review.md#cyberju--butler)
+
+逐轮对话、工具调用、评分证据和最终结论汇总在
+**[Langfuse Session Trace 复核记录](docs/langfuse-trace-review.md)**。
+
 ## 记忆机制
 
 记忆挂在 LangGraph 的 checkpointer 上，由 `thread_id` 定位。
